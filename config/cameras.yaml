@@ -1,0 +1,17 @@
+# Camera configuration
+# Each entry maps a camera_id to its source (RTSP URL or local file path)
+# The pipeline accepts both; local file paths are used for dev/testing without real cameras.
+
+cameras:
+  cam1:
+    source: "rtsp://your-camera-ip:554/stream"   # Replace with real RTSP URL, or:
+    # source: "/path/to/test_video.mp4"           # Use a local file for dev/testing
+    enabled: true
+    frame_skip: 3       # Process every Nth frame (1 = every frame; 3 = ~10fps on a 30fps stream)
+    description: "Front entrance camera"
+
+  cam2:
+    source: "/path/to/another_video.mp4"
+    enabled: false
+    frame_skip: 2
+    description: "Perimeter fence camera (disabled)"

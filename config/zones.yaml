@@ -1,0 +1,38 @@
+# Zone configuration per camera
+# polygon: list of [x, y] pixel coordinates forming the zone boundary (closed polygon)
+# schedule: "always" OR "HH:MM-HH:MM" in 24h format (supports midnight wrap, e.g. "22:00-06:00")
+# dwell_seconds: how long a track must be continuously inside the zone before triggering a candidate event
+# classes: which YOLO detection classes to apply this zone to (["person"], ["vehicle"], or ["person", "vehicle"])
+
+zones:
+  cam1:
+    - name: "perimeter_east"
+      polygon:
+        - [100, 200]
+        - [400, 200]
+        - [400, 500]
+        - [100, 500]
+      schedule: "22:00-06:00"   # active between 10pm and 6am
+      dwell_seconds: 3
+      classes: ["person", "vehicle"]
+
+    - name: "restricted_storage"
+      polygon:
+        - [500, 100]
+        - [700, 100]
+        - [700, 400]
+        - [500, 400]
+      schedule: "always"
+      dwell_seconds: 5
+      classes: ["person"]
+
+  cam2:
+    - name: "gate_entrance"
+      polygon:
+        - [200, 300]
+        - [600, 300]
+        - [600, 600]
+        - [200, 600]
+      schedule: "always"
+      dwell_seconds: 2
+      classes: ["person", "vehicle"]

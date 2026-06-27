@@ -1,0 +1,95 @@
+# EdgeVision — SENTINEL
+
+**AI-native, VMS-agnostic edge security analytics.**  
+A production-grade anomaly & threat detection layer for cameras you already own.
+
+---
+
+## The problem
+
+90–99% of security camera alerts are false positives. Operators stop trusting the system. Real threats get missed. Legacy motion detection is the culprit — it fires on wind, shadows, animals, and headlights.
+
+SENTINEL is built around one metric: **< 5% false positive rate** — the industry benchmark that most deployed systems never hit.
+
+## How it works
+
+A multi-stage verification pipeline runs entirely on-prem:
+
+```
+RTSP/ONVIF Camera Streams
+        │
+        ▼
+[Stage 1] Fast Detector (YOLO + ByteTrack)
+        — person/vehicle detection + stable track IDs
+        │
+        ▼
+[Stage 2] Rule Engine
+        — zone geometry, dwell time, schedule
+        — only forwards events that genuinely crossed a boundary
+        │
+        ▼
+[Stage 3] VLM Contextual Verifier  ← Phase 3 (coming)
+        — vision-language model confirms: "is this actually a person
+          climbing a fence, or a shadow the detector misread?"
+        │
+        ▼
+[Stage 4] Agentic Decision Layer
+        — structured incident record + evidence clip
+        — audit trail: detector confidence → rule trigger → VLM reasoning
+```
+
+Footage never leaves the site. Only structured metadata + optional low-res clips sync to the cloud control plane. Privacy-first by architecture, not just marketing.
+
+## Current status
+
+**Phase 1 complete** — core perception pipeline (detection + tracking + zone engine + evidence capture).  
+**Phase 3 next** — VLM contextual verifier (the primary FP reduction mechanism).
+
+See [SPEC.md](SPEC.md) for success metrics and [README_PHASE1.md](README_PHASE1.md) for build notes and how to run.
+
+## Quickstart
+
+```bash
+# Install
+pip install -e ".[dev]"
+
+# Run against a local video file
+python scripts/run_local.py \
+  --source /path/to/test_video.mp4 \
+  --camera-id cam1
+
+# Run unit tests
+pytest tests/ -v
+```
+
+Configure your camera sources in `config/cameras.yaml` and zone polygons in `config/zones.yaml`.
+
+## Tech stack
+
+| Layer | Choice |
+|---|---|
+| Detector | YOLO (Ultralytics) — exportable to TensorRT/ONNX for edge |
+| Tracker | ByteTrack via `supervision` |
+| Zone logic | Shapely (polygon) + custom dwell-time state machine |
+| Video I/O | OpenCV |
+| Edge runtime | Docker Compose (coming Phase 4) |
+| Cloud backend | FastAPI + Postgres (coming Phase 5) |
+| Dashboard | React + Tailwind (coming Phase 5) |
+
+## Roadmap
+
+| Phase | Status | Description |
+|---|---|---|
+| 0 | ✅ Done | Spec lock, repo scaffold |
+| 1 | ✅ Done | Core perception pipeline |
+| 2 | 🔜 Next | Synthetic data + YOLO fine-tuning |
+| 3 | 🔜 | VLM contextual verifier |
+| 4 | 🔜 | Edge containerisation (Docker) |
+| 5 | 🔜 | Cloud control plane + dashboard |
+| 6 | 🔜 | Explainability & audit trail |
+| 7 | 🔜 | MLOps & continuous learning loop |
+| 8 | 🔜 | Pilot packaging & GTM |
+
+## License
+
+MIT
