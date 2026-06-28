@@ -23,7 +23,7 @@ zones:
         - [700, 400]
         - [500, 400]
       schedule: "always"
-      dwell_seconds: 2
+      dwell_seconds: 5
       classes: ["person"]
 
   cam2:

@@ -54,13 +54,12 @@ See [SPEC.md](SPEC.md) for success metrics and [README_PHASE1.md](README_PHASE1.
 python3.12 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 
-# Download a sample video (optional)
-curl -L -o test_video.mp4 \
-  "https://github.com/intel-iot-devkit/sample-videos/raw/master/person-bicycle-car-detection.mp4"
+# Download / regenerate the Phase 1 smoke-test clip (optional if using committed fixture)
+python scripts/generate_smoke_test_video.py
 
 # Run against a local video file
 python scripts/run_local.py \
-  --source test_video.mp4 \
+  --source tests/fixtures/smoke_test_loiter.mp4 \
   --camera-id cam1 \
   --frame-skip 2
 

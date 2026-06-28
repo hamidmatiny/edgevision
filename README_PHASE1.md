@@ -37,28 +37,35 @@ source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
 ```
 
-### 2. Get a test video
+### 2. Smoke-test video (included in repo)
 
-**Recommended — Intel sample (people + vehicles, 768×432):**
+Phase 1 e2e smoke tests use a **deterministic loitering clip** committed at `tests/fixtures/smoke_test_loiter.mp4` (768×432, 12 fps, 15 s). A stationary person is held inside the `cam1` `restricted_storage` zone long enough to exceed the default **5 s** loitering threshold.
+
+Regenerate it any time (requires network — downloads Ultralytics `bus.jpg`):
+
 ```bash
-curl -L -o test_video.mp4 \
-  "https://github.com/intel-iot-devkit/sample-videos/raw/master/person-bicycle-car-detection.mp4"
+python scripts/generate_smoke_test_video.py
 ```
 
-**Alternative — record your own (30 seconds, walk through the configured zone):**
+**Alternative — record your own (~15 s, stand still in the configured zone):**
+
 ```bash
 python -c "
 import cv2, time
 cap = cv2.VideoCapture(0)
-out = cv2.VideoWriter('test_video.mp4', cv2.VideoWriter_fourcc(*'mp4v'), 30, (640, 480))
+out = cv2.VideoWriter('my_loiter.mp4', cv2.VideoWriter_fourcc(*'mp4v'), 12, (768, 432))
 t = time.time()
-while time.time() - t < 30:
+while time.time() - t < 15:
     ret, frame = cap.read()
-    if ret: out.write(frame)
+    if ret:
+        frame = cv2.resize(frame, (768, 432))
+        out.write(frame)
 cap.release(); out.release()
-print('Saved test_video.mp4')
+print('Saved my_loiter.mp4')
 "
 ```
+
+Adjust `config/zones.yaml` polygons if your camera resolution or framing differs.
 
 ### 3. Zone config
 
@@ -67,7 +74,7 @@ Open `config/zones.yaml`. Default `cam1` zones:
 | Zone | Polygon (approx.) | Schedule | Dwell | Classes |
 |---|---|---|---|---|
 | `perimeter_east` | Centre-left rectangle | `always` (dev) | 3s | person, vehicle |
-| `restricted_storage` | Right side of frame | `always` | 2s | person |
+| `restricted_storage` | Right side of frame | `always` | 5s | person |
 
 For production after-hours perimeter monitoring, set `perimeter_east` schedule to `"22:00-06:00"`. Adjust polygons to match your camera resolution and scene layout.
 
@@ -75,7 +82,7 @@ For production after-hours perimeter monitoring, set `perimeter_east` schedule t
 
 ```bash
 python scripts/run_local.py \
-  --source test_video.mp4 \
+  --source tests/fixtures/smoke_test_loiter.mp4 \
   --camera-id cam1 \
   --frame-skip 2 \
   --log-level INFO
@@ -83,13 +90,13 @@ python scripts/run_local.py \
 
 ### 5. Expected output
 
-After a person or vehicle dwells inside a zone for ≥ configured seconds **of video time**:
+After a person dwells inside `restricted_storage` for ≥ **5 seconds of video time**:
 
 ```
-2026-06-27 22:15:18 [INFO] sentinel.rules.zone_engine — CANDIDATE EVENT: track=1 zone='restricted_storage' camera=cam1 class=person dwell=3.7s conf=0.83 centroid=(694.7, 186.4)
-2026-06-27 22:15:18 [INFO] sentinel.events.event_builder — Event record saved: evidence/cam1_<uuid>.json
-2026-06-27 22:15:18 [INFO] sentinel.pipeline — [cam1] INCIDENT CONFIRMED — event_id=<uuid> ...
-2026-06-27 22:15:19 [INFO] sentinel.pipeline — [cam1] Clip ready: evidence/cam1_<uuid>_<ts>.mp4
+2026-06-27 22:35:22 [INFO] sentinel.rules.zone_engine — CANDIDATE EVENT: track=2 zone='restricted_storage' camera=cam1 class=person dwell=5.0s conf=0.84 centroid=(594.8, 269.7)
+2026-06-27 22:35:22 [INFO] sentinel.events.event_builder — Event record saved: evidence/cam1_<uuid>.json
+2026-06-27 22:35:22 [INFO] sentinel.pipeline — [cam1] INCIDENT CONFIRMED — event_id=<uuid> ...
+2026-06-27 22:35:23 [INFO] sentinel.pipeline — [cam1] Clip ready: evidence/cam1_<uuid>_<ts>.mp4
 ```
 
 **Files created in `evidence/`:**
@@ -109,12 +116,12 @@ After a person or vehicle dwells inside a zone for ≥ configured seconds **of v
   "centroid": [694.67, 186.45],
   "trigger_wall_time": 1782609318.7485702,
   "trigger_wall_time_iso": "2026-06-28T01:15:18.748570+00:00",
-  "dwell_elapsed_seconds": 3.667,
+  "dwell_elapsed_seconds": 5.0,
   "clip_path": "evidence/cam1_a3f7c2d1-..._1782609319.mp4",
   "vlm_verification": null,
   "audit_chain": {
     "stage1_confidence": 0.8343,
-    "stage2_zone_rule": "zone='restricted_storage' dwell=3.67s",
+    "stage2_zone_rule": "zone='restricted_storage' dwell=5.0s",
     "stage3_vlm": null,
     "final_decision": "candidate"
   }
@@ -137,7 +144,7 @@ All zone engine, config loader, stream timeline, event builder, and pipeline hel
 - **No cloud dashboard.** Phase 5.
 - **Single-camera only.** Multi-camera: run one process per camera, or spawn a thread per camera — the pipeline is per-camera by design.
 - **ByteTrack via `supervision` is deprecated** as of supervision v0.28 and will be removed in v0.30 — plan a tracker migration before upgrading supervision.
-- **Default zone polygons are scene-specific.** Adjust `config/zones.yaml` for your camera FOV; the committed defaults target the Intel sample video and a centre/right split layout.
+- **Default zone polygons are scene-specific.** The committed `smoke_test_loiter.mp4` matches the default `restricted_storage` polygon; adjust `config/zones.yaml` for your camera FOV.
 
 ## Verification checkpoint
 

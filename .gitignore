@@ -50,4 +50,7 @@ coverage.xml
 
 # MLflow / experiment tracking (Phase 7)
 mlruns/
+
+# Large downloaded datasets (Phase 2+)
+data/
 publish_to_github.sh

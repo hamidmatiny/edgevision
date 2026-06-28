@@ -1,0 +1,29 @@
+{
+  "dataset": {
+    "name": "exdark_people_test",
+    "manifest_path": "evaluation/datasets/exdark_people_test/manifest.json",
+    "description": "ExDark People class, official Testing split. Real low-light/night images with human-annotated person bounding boxes.",
+    "provenance": "Exclusively Dark Image Dataset (ExDark), non-commercial research use. See https://github.com/cs-chan/Exclusively-Dark-Image-Dataset",
+    "split": "testing",
+    "num_images": 209,
+    "num_ground_truth_boxes": 590
+  },
+  "model": {
+    "weights": "yolo11n.pt",
+    "confidence_threshold": 0.4,
+    "device": "cpu",
+    "target_class": "person"
+  },
+  "metrics": {
+    "iou_threshold": 0.5,
+    "precision": 0.908,
+    "recall": 0.6525,
+    "f1": 0.7594,
+    "ap50": 0.636,
+    "true_positives": 385,
+    "false_positives": 39,
+    "false_negatives": 205,
+    "num_predictions": 424
+  },
+  "generated_at_utc": "2026-06-28T01:52:52.223457+00:00"
+}
