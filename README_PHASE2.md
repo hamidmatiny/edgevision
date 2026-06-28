@@ -1,15 +1,39 @@
 # Phase 2 — Synthetic Data & Detector Fine-Tuning
 
-**Status:** Steps 2–3 complete. Fine-tuned weights **not wired into pipeline** (Step 4 deferred — and current numbers do not justify wiring).
+**Status:** ✅ Complete — **negative result, valuable diagnosis; stock `yolo11n.pt` retained in pipeline.**
 
-## Results summary (ExDark benchmark — same protocol as Step 1)
+Fine-tuned weights exist under `data/training/runs/lowlight_finetune/weights/best.pt` for reference but are **not** wired into `sentinel/detection/detector.py`.
+
+## Findings (Phase 2 close-out)
+
+### ExDark benchmark (out-of-domain) — did not improve
 
 | Model | Precision | Recall | F1 | AP@0.5 | TP | FP | FN |
 |---|---:|---:|---:|---:|---:|---:|---:|
 | Stock `yolo11n.pt` | 0.9080 | **0.6525** | 0.7594 | **0.6360** | 385 | 39 | 205 |
 | Fine-tuned (Intel CC-BY aug) | 0.5232 | 0.2102 | 0.2999 | 0.1691 | 124 | 113 | 466 |
 
-**Honest read:** Augmentation-only training on well-lit Intel sample footage **did not** close the ExDark recall gap — it moved in the wrong direction. This is a legitimate, expected possible outcome given the synthetic/real domain gap documented below. **Do not wire `best.pt` into production** based on these numbers. Next options: self-recorded night footage, heavier simulation, or different training strategy — not Step 4 wiring.
+Fine-tuning **hurt** real low-light recall on ExDark (Δ recall −0.44, Δ AP@0.5 −0.47). Stock weights remain in production code.
+
+### In-domain validation (augmented Intel holdout) — strong throughout
+
+Training val split draws from the **same augmented-Intel-frame pool** as training (`data/training/lowlight_yolo/images/val`, 200 images). Per-epoch metrics from `data/training/runs/lowlight_finetune/results.csv`:
+
+| Epoch | Val precision | Val recall | Val mAP@0.5 | Val mAP@0.5:0.95 |
+|---:|---:|---:|---:|---:|
+| 1 | 0.8920 | 0.5615 | 0.6637 | 0.4286 |
+| 15 | 0.9148 | 0.7664 | 0.8535 | 0.6995 |
+| 30 (final) | **0.9514** | **0.8016** | **0.8841** | **0.7584** |
+
+Val metrics were **strong and stable for the entire run** — improving from epoch 1 through 30 with no train/val divergence and no late-epoch collapse. Val losses (`val/box_loss`, `val/cls_loss`, `val/dfl_loss`) trended down consistently.
+
+### Diagnosis — data diversity / domain transfer, not optimization
+
+This rules out a **training-procedure failure** (bad learning rate, missing early stopping, broken labels, etc.) as the primary cause. The model successfully learned its **narrow training distribution** (294 parent frames, 4 Intel CC-BY videos, synthetically darkened via Albumentations) extremely well — and that distribution **does not overlap enough** with real ExDark night imagery to transfer.
+
+This is a **synthetic-data-diversity / domain-transfer limitation**, not a fixable hyperparameter issue. Retraining on the same Intel-derived pool with different epochs, LR, or augment settings would likely repeat the same outcome.
+
+**Implication for future low-light work:** the next serious attempt at improving low-light person recall needs **genuinely diverse real night footage** (or much more varied synthetic data with broader scene/lighting coverage) — not another pass on this Intel-derived pool with tweaked settings. Phase 2's primary FP-reduction path for the product is **Phase 3 (VLM contextual verifier)** on top of stock YOLO, not these fine-tuned weights.
 
 ## Licensing policy (read before any training work)
 
@@ -52,9 +76,9 @@ Albumentations-based low-light augmentation **approximates** darkness (gamma, br
 
 **ExDark remains the real-world benchmark precisely because of this gap.** It contains genuine low-light/night imagery with human-annotated boxes.
 
-If augmentation-only training on Intel CC-BY footage **does not meaningfully close the recall gap** on ExDark, that is a **legitimate, expected possible outcome** — not a failure of the implementation. Results are reported honestly either way in [`evaluation/baseline_metrics.md`](evaluation/baseline_metrics.md).
+If augmentation-only training on Intel CC-BY footage does not transfer to real low-light benchmarks, that is a **legitimate outcome** — documented in [`evaluation/baseline_metrics.md`](evaluation/baseline_metrics.md) and the Findings section above. Phase 2 confirmed this empirically.
 
-Heavier approaches (self-recorded night footage, simulation) are deferred unless this path proves insufficient.
+Future low-light detector work requires **broader real or synthetic night data** — not hyperparameter tuning on the same Intel pool.
 
 ## Step 1 — baseline (stock weights)
 
@@ -99,7 +123,7 @@ python scripts/run_finetuned_eval.py        # same ExDark protocol as Step 1; up
 cat evaluation/baseline_metrics.md
 ```
 
-Fine-tuned weights are **not** wired into `sentinel/detection/detector.py` until you verify the numbers (Step 4 — deferred).
+Fine-tuned weights are **not** wired into `sentinel/detection/detector.py`. Stock `yolo11n.pt` remains the pipeline default (see root `README.md`).
 
 ## Files
 
@@ -126,7 +150,11 @@ python scripts/run_finetune.py               # Step 3 fine-tune
 python scripts/run_finetuned_eval.py         # Step 3 ExDark eval + comparison row
 ```
 
+## Phase 2 outcome
+
+**Closed.** Negative result on ExDark transfer; in-domain training succeeded. Stock detector retained. Step 4 (wire fine-tuned weights) **will not be pursued** on this data pool.
+
 ## Deferred
 
-- Step 4: wire fine-tuned weights into `detector.py` (after you verify numbers)
 - DVC versioning (optional; manifest JSON is minimum provenance)
+- Future low-light detector attempt (requires new data sources — see Findings)

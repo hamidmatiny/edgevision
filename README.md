@@ -42,10 +42,13 @@ Footage never leaves the site. Only structured metadata + optional low-res clips
 
 ## Current status
 
-**Phase 1 complete** — core perception pipeline (detection + tracking + zone engine + evidence capture), verified with unit tests and local video smoke runs.  
-**Phase 2 next** — synthetic data + YOLO fine-tuning.
+**Phase 1 complete** — core perception pipeline (detection + tracking + zone engine + evidence capture), verified with unit tests and local video smoke runs.
 
-See [SPEC.md](SPEC.md) for success metrics and [README_PHASE1.md](README_PHASE1.md) for build notes and how to run.
+**Phase 2 complete** — synthetic low-light fine-tuning experiment. **Negative result:** ExDark recall regressed; in-domain val was strong (mAP@0.5 0.88 at epoch 30). Diagnosis: domain-transfer / data-diversity gap, not a training bug. **Stock `yolo11n.pt` retained** in `sentinel/detection/detector.py` — fine-tuned weights are **not** used in the pipeline.
+
+**Phase 3 next** — VLM contextual verifier (primary FP-reduction path).
+
+See [SPEC.md](SPEC.md) for success metrics, [README_PHASE1.md](README_PHASE1.md) and [README_PHASE2.md](README_PHASE2.md) for build notes.
 
 ## Quickstart
 
@@ -87,8 +90,8 @@ Configure your camera sources in `config/cameras.yaml` and zone polygons in `con
 |---|---|---|
 | 0 | ✅ Done | Spec lock, repo scaffold |
 | 1 | ✅ Done | Core perception pipeline |
-| 2 | 🔜 Next | Synthetic data + YOLO fine-tuning |
-| 3 | 🔜 | VLM contextual verifier |
+| 2 | ✅ Done | Synthetic low-light fine-tune — **negative ExDark transfer; stock YOLO retained** |
+| 3 | 🔜 Next | VLM contextual verifier |
 | 4 | 🔜 | Edge containerisation (Docker) |
 | 5 | 🔜 | Cloud control plane + dashboard |
 | 6 | 🔜 | Explainability & audit trail |

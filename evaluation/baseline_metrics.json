@@ -28,7 +28,7 @@
   "generated_at_utc": "2026-06-28T01:52:52.223457+00:00",
   "finetuned": {
     "weights": "data/training/runs/lowlight_finetune/weights/best.pt",
-    "generated_at_utc": "2026-06-28T02:59:44.976829+00:00",
+    "generated_at_utc": "2026-06-28T02:59:28.815115+00:00",
     "dataset": {
       "name": "exdark_people_test",
       "manifest_path": "evaluation/datasets/exdark_people_test/manifest.json",
@@ -39,7 +39,7 @@
       "num_ground_truth_boxes": 590
     },
     "model": {
-      "weights": "/Users/hamidrezamatiny/Cursor/edgevision/edgevision/data/training/runs/lowlight_finetune/weights/best.pt",
+      "weights": "data/training/runs/lowlight_finetune/weights/best.pt",
       "confidence_threshold": 0.4,
       "device": "cpu",
       "target_class": "person"

@@ -39,7 +39,10 @@ def update_comparison_markdown(
 ) -> None:
     content = md_path.read_text(encoding="utf-8")
     m = report["metrics"]
-    model_label = str(weights_path.relative_to(REPO_ROOT))
+    try:
+        model_label = str(weights_path.relative_to(REPO_ROOT))
+    except ValueError:
+        model_label = str(weights_path)
     notes = (
         "Intel CC-BY augmented training; ExDark benchmark only. "
         "See README_PHASE2.md for synthetic-data limitations."
@@ -52,18 +55,6 @@ def update_comparison_markdown(
         f"**{m['f1']:.4f}** | **{m['ap50']:.4f}** | {notes} |"
     )
 
-    pattern = re.compile(
-        r"(\| Model \| Precision \| Recall \| F1 \| AP@0\.5 \| Notes \|\n"
-        r"\|---\|---:|---:|---:|---:|---\|\n)"
-        r"\| \*\(not yet run\)\* \|[^\n]+\|\n",
-        re.MULTILINE,
-    )
-    if not pattern.search(content):
-        raise RuntimeError("Could not find pending fine-tuned comparison row in baseline_metrics.md")
-
-    content = pattern.sub(rf"\1{new_row}\n", content, count=1)
-
-    # Update section title from pending to complete
     content = content.replace(
         "## Fine-tuned comparison (Step 3 — pending)",
         "## Fine-tuned comparison (Step 3)",
@@ -73,6 +64,21 @@ def update_comparison_markdown(
         "Phase 2 Step 3 fine-tuned comparison is recorded below.",
     )
 
+    # Idempotent: replace all data rows under the fine-tuned comparison header.
+    table_pattern = re.compile(
+        r"(## Fine-tuned comparison \(Step 3\)[^\n]*\n\n"
+        r"\| Model \| Precision \| Recall \| F1 \| AP@0\.5 \| Notes \|\n"
+        r"\|---\|---:|---:|---:|---:|---\|\n)"
+        r"(?:\|[^\n]+\|\n)+",
+        re.MULTILINE,
+    )
+    match = table_pattern.search(content)
+    if not match:
+        raise RuntimeError(
+            "Could not find fine-tuned comparison table in baseline_metrics.md"
+        )
+
+    content = table_pattern.sub(rf"\1{new_row}\n", content, count=1)
     md_path.write_text(content, encoding="utf-8")
 
 
