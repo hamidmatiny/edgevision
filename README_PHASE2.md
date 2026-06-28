@@ -1,6 +1,15 @@
 # Phase 2 — Synthetic Data & Detector Fine-Tuning
 
-**Status:** Step 1 complete (baseline measured). Step 2+ pending data-plan approval.
+**Status:** Steps 2–3 complete. Fine-tuned weights **not wired into pipeline** (Step 4 deferred — and current numbers do not justify wiring).
+
+## Results summary (ExDark benchmark — same protocol as Step 1)
+
+| Model | Precision | Recall | F1 | AP@0.5 | TP | FP | FN |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Stock `yolo11n.pt` | 0.9080 | **0.6525** | 0.7594 | **0.6360** | 385 | 39 | 205 |
+| Fine-tuned (Intel CC-BY aug) | 0.5232 | 0.2102 | 0.2999 | 0.1691 | 124 | 113 | 466 |
+
+**Honest read:** Augmentation-only training on well-lit Intel sample footage **did not** close the ExDark recall gap — it moved in the wrong direction. This is a legitimate, expected possible outcome given the synthetic/real domain gap documented below. **Do not wire `best.pt` into production** based on these numbers. Next options: self-recorded night footage, heavier simulation, or different training strategy — not Step 4 wiring.
 
 ## Licensing policy (read before any training work)
 
@@ -10,25 +19,44 @@ The held-out test set [`evaluation/datasets/exdark_people_test/manifest.json`](e
 
 | Allowed | Not allowed |
 |---|---|
-| Running `scripts/run_baseline_eval.py` to **measure** precision/recall/AP@0.5 | Including ExDark images in YOLO fine-tuning |
+| Running evaluation scripts to **measure** precision/recall/AP@0.5 | Including ExDark images in YOLO fine-tuning |
 | Before/after comparisons on the **same** ExDark test split | Shipping model weights trained on ExDark |
 | Internal R&D benchmarking | Any commercial deployment where weights are derivatives of ExDark |
 
 **Why:** ExDark is licensed for **non-commercial research use only**. Fine-tuning production detector weights on ExDark would create a derivative work with real legal exposure at sale, customer deployment, or diligence.
 
-Step 1 baseline numbers in [`evaluation/baseline_metrics.md`](evaluation/baseline_metrics.md) remain valid as an **evaluation benchmark**. They do not authorize training on ExDark.
+### Training data — Intel sample-videos (CC-BY 4.0) + Albumentations
 
-### Training data (Step 2+) — commercial-safe sources only
+**Approved training source:** frames extracted from [Intel IoT DevKit sample-videos](https://github.com/intel-iot-devkit/sample-videos), licensed **CC-BY 4.0 (Attribution)** — commercial use permitted with attribution.
 
-Any image/frame used to **update model weights** must be:
+**Attribution (required):** Sample video footage from Intel IoT DevKit sample-videos (https://github.com/intel-iot-devkit/sample-videos), licensed under CC-BY 4.0. See also [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
-1. Footage/images **you own** (self-recorded), or
-2. Explicitly licensed for **commercial use and derivative models**, with license documented in the training manifest, or
-3. Fully **synthetic** (procedurally generated or augmented from commercial-safe inputs only)
+**Explicitly excluded from Step 2 training:**
 
-When a new external dataset is proposed, the license must be stated explicitly in this document **before** it enters the training manifest — same standard as the ExDark flag above.
+| Source | Status |
+|---|---|
+| ExDark | Benchmark only |
+| Ultralytics `bus.jpg` and other sample images | **NOT used** — only in Phase 1 `generate_smoke_test_video.py` |
+| COCO / random web images | Not used |
 
-## Step 1 complete — baseline (stock weights)
+The augmentation pipeline (`scripts/prepare_training_data.py`) resolves videos only via `sentinel/training/intel_sources.py`. It does not import or download Ultralytics sample images.
+
+## Synthetic-data limitation (honest assessment)
+
+Albumentations-based low-light augmentation **approximates** darkness (gamma, brightness, noise, color cast, blur). It does **not** fully replicate real low-light sensor behaviour:
+
+- Real ISO noise patterns and demosaicing artefacts
+- Motion blur from long exposures in actual night footage
+- Artificial-light glare, bloom, and mixed colour temperature
+- HDR/auto-exposure behaviour of security cameras
+
+**ExDark remains the real-world benchmark precisely because of this gap.** It contains genuine low-light/night imagery with human-annotated boxes.
+
+If augmentation-only training on Intel CC-BY footage **does not meaningfully close the recall gap** on ExDark, that is a **legitimate, expected possible outcome** — not a failure of the implementation. Results are reported honestly either way in [`evaluation/baseline_metrics.md`](evaluation/baseline_metrics.md).
+
+Heavier approaches (self-recorded night footage, simulation) are deferred unless this path proves insufficient.
+
+## Step 1 — baseline (stock weights)
 
 See [`evaluation/baseline_metrics.md`](evaluation/baseline_metrics.md).
 
@@ -38,93 +66,67 @@ See [`evaluation/baseline_metrics.md`](evaluation/baseline_metrics.md).
 | Recall | 0.6525 |
 | AP@0.5 | 0.6360 |
 
-Fine-tuning (Step 3) must beat these numbers on the **same ExDark benchmark** without training on ExDark.
-
-## Proposed training data plan (awaiting approval)
-
-**Do not implement until approved.**
-
-### Primary source — self-recorded footage (recommended)
-
-| Item | Proposal |
-|---|---|
-| **License** | You own the footage → full commercial rights |
-| **Volume** | 8–12 clips × 30–60 s (≈4–8 min total) |
-| **Scenarios** | (1) person loitering 5+ s in frame, (2) person walking through scene, (3) partial occlusion / edge of frame, (4) one vehicle pass if available |
-| **Lighting** | At least half recorded at dusk/night or dim indoor — matches product use case |
-| **Resolution** | 720p or 1080p; static camera angle similar to a fixed security cam |
-| **Labels** | Extract frames (e.g. 2 fps), label person boxes in CVAT/Label Studio **or** pseudo-label from stock YOLO on a bright duplicate exposure (document which); all labels stored in a versioned manifest |
-
-### Secondary source — synthetic low-light augmentation (commercial-safe)
-
-| Item | Proposal |
-|---|---|
-| **License** | Derived only from **self-recorded** frames (or other approved commercial-safe inputs) |
-| **Method** | Extend Phase 1 compositing pattern + [Albumentations](https://albumentations.ai/) transforms: underexposure, gamma, Gaussian noise, contrast compression, color-temperature shift |
-| **Output** | 3–5× expansion of owned frames; manifest records `source_image_id`, `augmentation_pipeline`, `synthetic=true` |
-| **Not used** | ExDark; random web images without license check |
-
-### Explicitly not in training mix
-
-| Source | Reason |
-|---|---|
-| **ExDark** | Non-commercial research only |
-| **Ultralytics sample images (`bus.jpg`, etc.)** | Sourced from COCO-like collections; not verified for commercial derivative training |
-| **COCO train/val images** | Per-image license heterogeneity; unsafe default for commercial weight training without legal review |
-| **NightOwls** | Oxford license: non-commercial research, no redistribution — same class of problem as ExDark |
-
-### Evaluation split (unchanged)
-
-| Set | Role | Source |
-|---|---|---|
-| `exdark_people_test` | Held-out **benchmark** only | ExDark People / Testing |
-| User footage holdout | Optional training-time val (not ExDark) | 15–20% of your clips, never augmented into train |
-
-### Provenance tracking (Step 2 implementation)
-
-Manifest JSON per training image (DVC deferred for Phase 2 unless you prefer it now):
-
-```json
-{
-  "image_id": "...",
-  "source": "self_recorded | synthetic_augment",
-  "license": "owner: Hamid Matiny / commercial OK",
-  "parent_image_id": null,
-  "augmentations": ["RandomGamma", "GaussNoise"]
-}
-```
-
-### Scope note (unchanged from phase plan)
-
-We are **not** building Omniverse/Unity simulation in Phase 2. Heavier simulation is deferred until augmentation + owned footage fails to close the recall gap on the ExDark benchmark.
-
-## Files (Step 1)
-
-| Path | Purpose |
-|---|---|
-| `sentinel/evaluation/metrics.py` | Detection metrics (P/R/F1/AP@0.5) |
-| `scripts/prepare_lowlight_testset.py` | Build ExDark **benchmark** manifest |
-| `scripts/run_baseline_eval.py` | Stock-weight evaluation |
-| `evaluation/baseline_metrics.md` | Baseline numbers + license notes |
-| `tests/test_evaluation_metrics.py` | Metric unit tests |
-
-## Reproduce baseline (benchmark only)
+## Step 2 — training data pipeline
 
 ```bash
-python scripts/prepare_lowlight_testset.py   # downloads ExDark to data/exdark/ (gitignored)
-python scripts/run_baseline_eval.py
+python scripts/prepare_training_data.py
+```
+
+**What it does:**
+
+1. Resolves Intel sample-videos (downloads to `data/training/sources/` if missing; uses repo-root `test_video.mp4` alias for `person-bicycle-car-detection.mp4`).
+2. Extracts every 6th frame (~2 fps at 12 fps source).
+3. Pseudo-labels **person** boxes on **bright source frames** with stock `yolo11n.pt` (conf ≥ 0.5).
+4. Applies **4 Albumentations low-light recipes** per labeled parent frame (~4× expansion).
+5. Writes YOLO dataset to `data/training/lowlight_yolo/` + versioned `manifest.json`.
+
+Each manifest row includes: `source`, `license`, `parent_image_id`, `augmentations`, `synthetic`, `attribution`.
+
+**Intel videos used:**
+
+| File | Notes |
+|---|---|
+| `person-bicycle-car-detection.mp4` | Also available as `test_video.mp4` |
+| `people-detection.mp4` | |
+| `one-by-one-person-detection.mp4` | |
+| `face-demographics-walking.mp4` | |
+
+## Step 3 — fine-tune + benchmark eval
+
+```bash
+python scripts/run_finetune.py              # writes best.pt to data/training/runs/lowlight_finetune/
+python scripts/run_finetuned_eval.py        # same ExDark protocol as Step 1; updates baseline_metrics.md
 cat evaluation/baseline_metrics.md
 ```
 
-## Known limitations
+Fine-tuned weights are **not** wired into `sentinel/detection/detector.py` until you verify the numbers (Step 4 — deferred).
 
-- ExDark benchmark ≠ your deployment camera FOV/lighting; it is a proxy for low-light person detection difficulty.
-- ExDark **cannot** train production weights (see licensing policy above).
-- Baseline uses `yolo11n.pt` at conf=0.4 on CPU; GPU numbers may differ slightly.
+## Files
+
+| Path | Purpose |
+|---|---|
+| `sentinel/training/intel_sources.py` | Approved CC-BY video list + license constants |
+| `sentinel/training/augmentations.py` | Albumentations low-light recipes |
+| `scripts/prepare_training_data.py` | Build YOLO dataset + manifest |
+| `scripts/run_finetune.py` | Fine-tune on augmented Intel data |
+| `scripts/run_finetuned_eval.py` | ExDark before/after comparison |
+| `scripts/run_baseline_eval.py` | Step 1 stock-weight eval |
+| `evaluation/baseline_metrics.md` | Baseline + fine-tuned comparison table |
+| `THIRD_PARTY_NOTICES.md` | License attributions |
+| `tests/test_training_augmentations.py` | Augmentation unit tests |
+
+## Reproduce full Phase 2 eval loop
+
+```bash
+pip install -e ".[dev,train]"
+python scripts/prepare_lowlight_testset.py   # ExDark benchmark (eval only)
+python scripts/run_baseline_eval.py          # Step 1 baseline
+python scripts/prepare_training_data.py      # Step 2 training data
+python scripts/run_finetune.py               # Step 3 fine-tune
+python scripts/run_finetuned_eval.py         # Step 3 ExDark eval + comparison row
+```
 
 ## Deferred
 
-- Step 2 training pipeline implementation (pending data-plan approval)
-- Step 3 fine-tuning and before/after table row
-- Step 4 wiring improved weights into `detector.py`
-- DVC versioning (optional; manifest JSON minimum for Phase 2)
+- Step 4: wire fine-tuned weights into `detector.py` (after you verify numbers)
+- DVC versioning (optional; manifest JSON is minimum provenance)

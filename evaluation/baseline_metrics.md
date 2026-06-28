@@ -3,8 +3,7 @@
 Generated: 2026-06-28T01:52:52.223457+00:00
 
 This file records **stock pretrained YOLO weights** performance on the held-out
-low-light test set **before any Phase 2 fine-tuning**. Phase 2 Step 3 will add a
-fine-tuned comparison row to this document.
+low-light test set **before any Phase 2 fine-tuning**. Phase 2 Step 3 fine-tuned comparison is recorded below.
 
 ## Test set
 
@@ -54,17 +53,20 @@ the best unmatched ground-truth box with IoU ≥ 0.5.
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
 | `yolo11n.pt` | **0.9080** | **0.6525** | **0.7594** | **0.6360** | 385 | 39 | 205 | 424 |
 
-## Fine-tuned comparison (Step 3 — pending)
+## Fine-tuned comparison (Step 3)
 
 | Model | Precision | Recall | F1 | AP@0.5 | Notes |
 |---|---:|---:|---:|---:|---|
-| *(not yet run)* | — | — | — | — | Added after Step 3 fine-tuning |
+| `data/training/runs/lowlight_finetune/weights/best.pt` | **0.5232** | **0.2102** | **0.2999** | **0.1691** | Intel CC-BY augmented training; ExDark benchmark only. See README_PHASE2.md for synthetic-data limitations. Training manifest: `data/training/lowlight_yolo/manifest.json`. |
 
 ## Reproduce
 
 ```bash
 python scripts/prepare_lowlight_testset.py
 python scripts/run_baseline_eval.py
+python scripts/prepare_training_data.py
+python scripts/run_finetune.py
+python scripts/run_finetuned_eval.py
 cat evaluation/baseline_metrics.md
 ```
 
