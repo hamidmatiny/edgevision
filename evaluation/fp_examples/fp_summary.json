@@ -1,0 +1,67 @@
+[
+  {
+    "image_id": "2015_06700.png",
+    "image_path": "/Users/hamidrezamatiny/Cursor/edgevision/edgevision/data/exdark/images/ExDark/People/2015_06700.png",
+    "confidence": 0.8848761320114136,
+    "bbox": [
+      966.1078491210938,
+      14.410011291503906,
+      1438.132568359375,
+      883.1068115234375
+    ],
+    "best_iou_to_any_gt": 0.0,
+    "num_gt_in_image": 1
+  },
+  {
+    "image_id": "2015_06701.png",
+    "image_path": "/Users/hamidrezamatiny/Cursor/edgevision/edgevision/data/exdark/images/ExDark/People/2015_06701.png",
+    "confidence": 0.8118277192115784,
+    "bbox": [
+      1.9774017333984375,
+      120.4137954711914,
+      590.0462036132812,
+      884.1730346679688
+    ],
+    "best_iou_to_any_gt": 0.0,
+    "num_gt_in_image": 1
+  },
+  {
+    "image_id": "2015_06656.JPEG",
+    "image_path": "/Users/hamidrezamatiny/Cursor/edgevision/edgevision/data/exdark/images/ExDark/People/2015_06656.JPEG",
+    "confidence": 0.8098852038383484,
+    "bbox": [
+      457.7760314941406,
+      144.83065795898438,
+      499.7337951660156,
+      368.4036865234375
+    ],
+    "best_iou_to_any_gt": 0.3402758600395941,
+    "num_gt_in_image": 10
+  },
+  {
+    "image_id": "2015_06759.jpg",
+    "image_path": "/Users/hamidrezamatiny/Cursor/edgevision/edgevision/data/exdark/images/ExDark/People/2015_06759.jpg",
+    "confidence": 0.7707886099815369,
+    "bbox": [
+      0.194366455078125,
+      568.4987182617188,
+      54.40424728393555,
+      1024.0
+    ],
+    "best_iou_to_any_gt": 0.10671241142691958,
+    "num_gt_in_image": 7
+  },
+  {
+    "image_id": "2015_06799.jpg",
+    "image_path": "/Users/hamidrezamatiny/Cursor/edgevision/edgevision/data/exdark/images/ExDark/People/2015_06799.jpg",
+    "confidence": 0.7419883012771606,
+    "bbox": [
+      1.2692413330078125,
+      896.5612182617188,
+      451.0147399902344,
+      2444.455322265625
+    ],
+    "best_iou_to_any_gt": 0.07331090864669994,
+    "num_gt_in_image": 6
+  }
+]

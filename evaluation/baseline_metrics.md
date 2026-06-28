@@ -19,8 +19,20 @@ fine-tuned comparison row to this document.
 
 ExDark People class, official Testing split. Real low-light/night images with human-annotated person bounding boxes.
 
-**Important:** This is **real low-light imagery** from ExDark (not a synthetic
-darkening proxy). ExDark is licensed for non-commercial research use only.
+## Licensing — benchmark only (not training data)
+
+ExDark is licensed for **non-commercial research use only**. See the ExDark dataset README:
+https://github.com/cs-chan/Exclusively-Dark-Image-Dataset
+
+| Use | Allowed? |
+|---|---|
+| Measure stock / fine-tuned detector on this held-out test set | **Yes** — normal benchmarking |
+| Include ExDark images in YOLO fine-tuning | **No** — would create commercially encumbered weights |
+| Deploy fine-tuned weights trained on ExDark to paying customers | **No** |
+
+**This project targets a commercial product.** ExDark remains our **evaluation benchmark** for before/after recall/precision comparisons. It must **never** appear in the Phase 2 training manifest. Training data will use commercial-safe sources only (self-recorded footage and/or synthetic augmentation of owned images). See [`README_PHASE2.md`](../README_PHASE2.md).
+
+**Important:** This is **real low-light imagery** from ExDark (not a synthetic darkening proxy).
 
 ## Evaluation setup
 
