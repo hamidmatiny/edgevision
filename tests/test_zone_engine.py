@@ -393,3 +393,78 @@ class TestZoneEngineSchedule:
         engine.evaluate(0.0, [det], zones, now=night)
         result = engine.evaluate(2.1, [det], zones, now=night)
         assert len(result) == 1
+
+
+# ---------------------------------------------------------------------------
+# Stream timeline dwell (independent of processing wall clock)
+# ---------------------------------------------------------------------------
+
+class TestZoneEngineStreamTimeline:
+    def test_dwell_uses_stream_time_not_processing_gaps(self):
+        """Intermediate stream times can be skipped; dwell is measured on stream timeline."""
+        engine = ZoneEngine(camera_id="cam_stream")
+        zone = make_zone(dwell_seconds=3.0)
+        zones = [zone]
+        det = make_det(track_id=1)
+
+        engine.evaluate(0.0, [det], zones)
+        result = engine.evaluate(3.0, [det], zones)
+        assert len(result) == 1
+        assert result[0].dwell_elapsed == pytest.approx(3.0, abs=1e-6)
+
+    def test_dwell_fires_at_exact_rational_stream_time(self):
+        """Regression: 67/12 - 43/12 must satisfy a 2.0s threshold (float != 2.0)."""
+        engine = ZoneEngine(camera_id="cam_fp")
+        zone = make_zone(dwell_seconds=2.0)
+        zones = [zone]
+        det = make_det(track_id=1)
+
+        entry_time = 43 / 12
+        check_time = 67 / 12
+        engine.evaluate(entry_time, [det], zones)
+        result = engine.evaluate(check_time, [det], zones)
+        assert len(result) == 1
+        assert result[0].dwell_elapsed == pytest.approx(2.0, abs=1e-6)
+
+    def test_dwell_requires_full_threshold_on_stream_timeline(self):
+        engine = ZoneEngine(camera_id="cam_stream2")
+        zone = make_zone(dwell_seconds=3.0)
+        zones = [zone]
+        det = make_det(track_id=1)
+
+        engine.evaluate(0.0, [det], zones)
+        assert engine.evaluate(2.9, [det], zones) == []
+        result = engine.evaluate(3.0, [det], zones)
+        assert len(result) == 1
+
+
+# ---------------------------------------------------------------------------
+# Unmatched track IDs (track_id < 0)
+# ---------------------------------------------------------------------------
+
+class TestZoneEngineTrackIdFilter:
+    def test_negative_track_id_does_not_create_dwell_state(self):
+        engine = ZoneEngine(camera_id="cam_untracked")
+        zone = make_zone(dwell_seconds=1.0)
+        zones = [zone]
+        det = make_det(track_id=-1)
+
+        for t in [0.0, 1.5, 3.0]:
+            assert engine.evaluate(t, [det], zones) == []
+
+        assert engine._dwell == {}
+
+    def test_negative_track_id_does_not_reset_positive_track_dwell(self):
+        engine = ZoneEngine(camera_id="cam_mixed")
+        zone = make_zone(dwell_seconds=3.0)
+        zones = [zone]
+
+        engine.evaluate(0.0, [make_det(track_id=1)], zones)
+        # Unmatched detection alongside the tracked one must not reset track 1's dwell.
+        engine.evaluate(
+            1.0,
+            [make_det(track_id=1), make_det(track_id=-1)],
+            zones,
+        )
+        result = engine.evaluate(3.0, [make_det(track_id=1)], zones)
+        assert len(result) == 1

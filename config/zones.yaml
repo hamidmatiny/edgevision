@@ -12,7 +12,7 @@ zones:
         - [400, 200]
         - [400, 500]
         - [100, 500]
-      schedule: "22:00-06:00"   # active between 10pm and 6am
+      schedule: "always"   # use "22:00-06:00" for production after-hours perimeter
       dwell_seconds: 3
       classes: ["person", "vehicle"]
 
@@ -23,7 +23,7 @@ zones:
         - [700, 400]
         - [500, 400]
       schedule: "always"
-      dwell_seconds: 5
+      dwell_seconds: 2
       classes: ["person"]
 
   cam2:

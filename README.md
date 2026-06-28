@@ -42,21 +42,27 @@ Footage never leaves the site. Only structured metadata + optional low-res clips
 
 ## Current status
 
-**Phase 1 complete** — core perception pipeline (detection + tracking + zone engine + evidence capture).  
-**Phase 3 next** — VLM contextual verifier (the primary FP reduction mechanism).
+**Phase 1 complete** — core perception pipeline (detection + tracking + zone engine + evidence capture), verified with unit tests and local video smoke runs.  
+**Phase 2 next** — synthetic data + YOLO fine-tuning.
 
 See [SPEC.md](SPEC.md) for success metrics and [README_PHASE1.md](README_PHASE1.md) for build notes and how to run.
 
 ## Quickstart
 
 ```bash
-# Install
+# Install (Python 3.10–3.12 recommended)
+python3.12 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
+
+# Download a sample video (optional)
+curl -L -o test_video.mp4 \
+  "https://github.com/intel-iot-devkit/sample-videos/raw/master/person-bicycle-car-detection.mp4"
 
 # Run against a local video file
 python scripts/run_local.py \
-  --source /path/to/test_video.mp4 \
-  --camera-id cam1
+  --source test_video.mp4 \
+  --camera-id cam1 \
+  --frame-skip 2
 
 # Run unit tests
 pytest tests/ -v

@@ -6,7 +6,9 @@ Key features:
   - Transparent abstraction: callers don't care if source is RTSP or file.
   - Frame-skip: only yields every Nth frame (configurable) to control processing FPS.
   - Retry with exponential backoff for RTSP disconnections (does NOT crash).
-  - Yields (frame_index, timestamp, frame_bgr) tuples.
+  - Yields (frame_index, wall_time, stream_time, frame_bgr) tuples.
+    stream_time is seconds on the source timeline (raw_frame_index / fps),
+    independent of how fast the processing loop runs.
 """
 
 from __future__ import annotations
@@ -27,11 +29,11 @@ BASE_RETRY_BACKOFF = 1.0
 
 class StreamReader:
     """
-    Iterable video source that yields (frame_index, wall_time, frame_bgr) tuples.
+    Iterable video source that yields (frame_index, wall_time, stream_time, frame_bgr).
 
     Usage:
         reader = StreamReader(source="rtsp://...", frame_skip=3)
-        for frame_idx, ts, frame in reader:
+        for frame_idx, wall_time, stream_time, frame in reader:
             process(frame)
     """
 
@@ -54,13 +56,14 @@ class StreamReader:
         self.camera_id = camera_id
         self._is_rtsp = source.lower().startswith("rtsp://")
         self._cap: Optional[cv2.VideoCapture] = None
+        self._source_fps: float = 30.0
 
     # ------------------------------------------------------------------
     # Public interface
     # ------------------------------------------------------------------
 
-    def __iter__(self) -> Generator[tuple[int, float, np.ndarray], None, None]:
-        """Yield (frame_index, wall_time_seconds, bgr_frame) tuples."""
+    def __iter__(self) -> Generator[tuple[int, float, float, np.ndarray], None, None]:
+        """Yield (frame_index, wall_time, stream_time, bgr_frame) tuples."""
         yield from self._read_loop()
 
     def release(self) -> None:
@@ -86,15 +89,20 @@ class StreamReader:
             raise IOError(f"[{self.camera_id}] Cannot open source: {self.source}")
 
         fps = cap.get(cv2.CAP_PROP_FPS)
+        self._source_fps = fps if fps and fps > 0 else 30.0
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         logger.info(
             "[%s] Stream opened: %dx%d @ %.1f fps (processing every %d frame(s))",
-            self.camera_id, width, height, fps, self.frame_skip,
+            self.camera_id, width, height, self._source_fps, self.frame_skip,
         )
         return cap
 
-    def _read_loop(self) -> Generator[tuple[int, float, np.ndarray], None, None]:
+    def _stream_time_seconds(self, raw_frame_idx: int) -> float:
+        """Map a 1-based raw frame index to seconds on the source timeline."""
+        return (raw_frame_idx - 1) / self._source_fps
+
+    def _read_loop(self) -> Generator[tuple[int, float, float, np.ndarray], None, None]:
         raw_frame_idx = 0   # counts every raw frame read from source
         processed_count = 0 # counts frames actually yielded
         retry_backoff = BASE_RETRY_BACKOFF
@@ -141,12 +149,13 @@ class StreamReader:
 
             wall_time = time.time()
             raw_frame_idx += 1
+            stream_time = self._stream_time_seconds(raw_frame_idx)
 
             # --- Frame skip ---
             if (raw_frame_idx % self.frame_skip) != 0:
                 continue
 
-            yield processed_count, wall_time, frame
+            yield processed_count, wall_time, stream_time, frame
             processed_count += 1
 
         self.release()

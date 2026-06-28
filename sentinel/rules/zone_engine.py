@@ -9,6 +9,8 @@ Responsibilities:
 Design notes:
   - Uses shapely for the polygon check; do not hand-roll point-in-polygon.
   - Dwell timer is per (track_id, zone_name, camera_id) triple.
+  - Dwell elapsed time is measured on the source stream timeline (seconds), not
+    processing wall clock. Callers must pass stream_time from StreamReader.
   - If a track LEAVES the zone and RE-ENTERS, the dwell timer RESETS to zero on re-entry.
     This is explicit policy: a transient walk-through that leaves and comes back is treated
     as a new event candidate, not accumulated dwell time.
@@ -26,6 +28,9 @@ from typing import Optional
 from shapely.geometry import Point, Polygon
 
 logger = logging.getLogger(__name__)
+
+# Tolerance for stream-timeline dwell comparisons (e.g. 67/12 - 43/12 in float).
+_DWELL_EPSILON = 1e-6
 
 
 # ---------------------------------------------------------------------------
@@ -46,7 +51,7 @@ class ZoneConfig:
 class DwellState:
     """Mutable dwell-time tracking for one (track_id, zone) pair."""
     inside: bool = False
-    entry_time: Optional[float] = None   # monotonic timestamp (seconds) of when the track entered
+    entry_time: Optional[float] = None   # stream timeline (seconds) when the track entered
 
 
 @dataclass
@@ -58,7 +63,7 @@ class CandidateEvent:
     detection_class: str
     confidence: float
     centroid: tuple[float, float]
-    trigger_time: float        # monotonic timestamp
+    trigger_time: float        # stream timeline timestamp (seconds)
     dwell_elapsed: float       # seconds spent continuously inside the zone
 
 
@@ -156,7 +161,7 @@ class ZoneEngine:
 
     def evaluate(
         self,
-        frame_time: float,           # monotonic time in seconds (e.g. time.monotonic())
+        frame_time: float,           # stream timeline in seconds (from StreamReader)
         detections: list[dict],      # each: {track_id, class, confidence, centroid: (x,y)}
         zones: list[ZoneConfig],
         now: Optional[datetime] = None,
@@ -177,6 +182,8 @@ class ZoneEngine:
 
         for det in detections:
             track_id: int = det["track_id"]
+            if track_id < 0:
+                continue
             det_class: str = det["class"].lower()
             confidence: float = det["confidence"]
             centroid: tuple[float, float] = det["centroid"]
@@ -213,7 +220,7 @@ class ZoneEngine:
                 # Track was already inside; check dwell elapsed
                 dwell_elapsed = frame_time - state.entry_time  # type: ignore[operator]
 
-                if dwell_elapsed >= zone.dwell_seconds and key not in self._fired:
+                if dwell_elapsed + _DWELL_EPSILON >= zone.dwell_seconds and key not in self._fired:
                     self._fired.add(key)
                     logger.info(
                         "CANDIDATE EVENT: track=%d zone='%s' camera=%s class=%s "

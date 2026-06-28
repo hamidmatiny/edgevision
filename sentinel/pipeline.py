@@ -18,8 +18,8 @@ Architecture note:
 
 from __future__ import annotations
 
+import json
 import logging
-import time
 from pathlib import Path
 from typing import Optional
 
@@ -28,7 +28,12 @@ import yaml
 from sentinel.detection.detector import Detector
 from sentinel.detection.tracker import Tracker
 from sentinel.events.clip_writer import ClipWriter
-from sentinel.events.event_builder import build_event, save_event, update_clip_path
+from sentinel.events.event_builder import (
+    build_event,
+    rewrite_event,
+    save_event,
+    update_clip_path,
+)
 from sentinel.ingestion.stream_reader import StreamReader
 from sentinel.rules.zone_engine import ZoneEngine, parse_zone_config
 
@@ -66,7 +71,8 @@ class VLMVerifierStub:
 def load_zones_for_camera(zones_yaml_path: str, camera_id: str) -> list:
     with open(zones_yaml_path, "r") as f:
         raw = yaml.safe_load(f)
-    camera_zones = raw.get(camera_id, [])
+    zones_root = raw.get("zones", {})
+    camera_zones = zones_root.get(camera_id, [])
     if not camera_zones:
         logger.warning("No zones configured for camera '%s'.", camera_id)
     return [parse_zone_config(z) for z in camera_zones]
@@ -139,6 +145,7 @@ class CameraPipeline:
         )
 
         self._frame_count = 0
+        self._event_json_paths: dict[str, str] = {}
 
     def run(self, max_frames: Optional[int] = None) -> None:
         """
@@ -160,8 +167,8 @@ class CameraPipeline:
             )
 
         try:
-            for frame_idx, wall_time, frame_bgr in self.reader:
-                self._process_frame(frame_idx, wall_time, frame_bgr)
+            for frame_idx, wall_time, stream_time, frame_bgr in self.reader:
+                self._process_frame(frame_idx, wall_time, stream_time, frame_bgr)
                 self._frame_count += 1
 
                 if max_frames is not None and self._frame_count >= max_frames:
@@ -173,12 +180,18 @@ class CameraPipeline:
         finally:
             leftover_clips = self.clip_writer.flush_all()
             if leftover_clips:
+                self._handle_completed_clips(leftover_clips)
                 logger.info("[%s] Flushed %d pending clip(s).", self.camera_id, len(leftover_clips))
             self.reader.release()
             logger.info("[%s] Pipeline stopped. Processed %d frames.", self.camera_id, self._frame_count)
 
-    def _process_frame(self, frame_idx: int, wall_time: float, frame_bgr) -> None:
-        mono_time = time.monotonic()
+    def _process_frame(
+        self,
+        frame_idx: int,
+        wall_time: float,
+        stream_time: float,
+        frame_bgr,
+    ) -> None:
         h, w = frame_bgr.shape[:2]
 
         # --- Stage 1a: Detect ---
@@ -201,7 +214,7 @@ class CameraPipeline:
 
         # --- Stage 2: Zone/rule engine ---
         candidates = self.zone_engine.evaluate(
-            frame_time=mono_time,
+            frame_time=stream_time,
             detections=tracked_detections,
             zones=self.zones,
         )
@@ -223,9 +236,7 @@ class CameraPipeline:
             # --- Stage 4: Build and save event record ---
             event_record = build_event(candidate, wall_time=wall_time)
             event_path = save_event(event_record, output_dir=self.evidence_dir)
-
-            # Trigger clip capture
-            event_id = event_record["event_id"]
+            self._event_json_paths[event_id := event_record["event_id"]] = event_path
             self.clip_writer.trigger(event_id=event_id)
 
             logger.info(
@@ -238,6 +249,33 @@ class CameraPipeline:
             )
 
     def _handle_completed_clips(self, clip_paths: list[str]) -> None:
-        """Log completed clips (future: update event record with clip_path)."""
+        """Log completed clips and patch the corresponding event JSON with clip_path."""
         for clip_path in clip_paths:
             logger.info("[%s] Clip ready: %s", self.camera_id, clip_path)
+            event_id = self._event_id_from_clip_path(clip_path)
+            if event_id is None:
+                logger.warning("[%s] Could not parse event_id from clip path: %s", self.camera_id, clip_path)
+                continue
+
+            json_path = self._event_json_paths.get(event_id)
+            if json_path is None:
+                logger.warning("[%s] No event JSON tracked for event_id=%s", self.camera_id, event_id)
+                continue
+
+            with open(json_path, encoding="utf-8") as f:
+                record = json.load(f)
+            updated = update_clip_path(record, clip_path)
+            rewrite_event(updated, json_path)
+
+    @staticmethod
+    def _event_id_from_clip_path(clip_path: str) -> Optional[str]:
+        """
+        Parse event_id from clip filename: <camera_id>_<event_id>_<timestamp>.mp4
+        """
+        stem = Path(clip_path).stem
+        parts = stem.split("_", 1)
+        if len(parts) != 2:
+            return None
+        event_and_ts = parts[1]
+        event_id, _, _ts = event_and_ts.rpartition("_")
+        return event_id or None

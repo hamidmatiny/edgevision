@@ -136,3 +136,9 @@ def update_clip_path(record: dict, clip_path: str) -> dict:
     updated = dict(record)
     updated["clip_path"] = clip_path
     return updated
+
+
+def rewrite_event(record: dict, path: str | Path) -> None:
+    """Overwrite an existing IncidentRecord JSON file on disk."""
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(record, f, indent=2, ensure_ascii=False)

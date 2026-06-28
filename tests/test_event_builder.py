@@ -20,6 +20,7 @@ import pytest
 from sentinel.events.event_builder import (
     SCHEMA_VERSION,
     build_event,
+    rewrite_event,
     save_event,
     update_clip_path,
 )
@@ -187,3 +188,17 @@ class TestUpdateClipPath:
         updated = update_clip_path(record, "/evidence/clip.mp4")
         assert updated["event_id"] == record["event_id"]
         assert updated["camera_id"] == record["camera_id"]
+
+
+class TestRewriteEvent:
+    def test_rewrite_event_updates_file_on_disk(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            record = build_event(make_candidate(), wall_time=1719000000.0)
+            path = save_event(record, output_dir=tmpdir)
+            updated = update_clip_path(record, f"{tmpdir}/clip.mp4")
+            rewrite_event(updated, path)
+
+            with open(path, encoding="utf-8") as f:
+                loaded = json.load(f)
+            assert loaded["clip_path"] == f"{tmpdir}/clip.mp4"
+            assert loaded["event_id"] == record["event_id"]
