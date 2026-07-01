@@ -67,3 +67,32 @@ with licensing implications for commercial deployment.
 **Repository:** https://github.com/albumentations-team/albumentations
 
 **License:** MIT License
+
+---
+
+## Moondream 2 — proposed Phase 3 VLM (not yet integrated)
+
+**Planned use:** Stage 3 contextual verifier (local inference only).
+
+**Repository:** https://huggingface.co/vikhyatk/moondream2
+
+**Revision (pinned for production):** `2025-06-21`
+
+**License:** **Apache License 2.0**
+
+**Commercial use:** Permitted with attribution and license notice preservation. See [`README_PHASE3.md`](README_PHASE3.md) Step 3.1 review.
+
+**Attribution (required when integrated):** Vision-language verification uses Moondream 2 (vikhyatk/moondream2), licensed under Apache 2.0.
+
+**Not used:** Moondream cloud API (`api.moondream.ai`) — on-prem requirement.
+
+---
+
+## SmolVLM-256M-Instruct — Phase 3 fallback candidate (not integrated)
+
+**Repository:** https://huggingface.co/HuggingFaceTB/SmolVLM-256M-Instruct
+
+**License:** **Apache License 2.0**
+
+**Commercial use:** Permitted with attribution. Fallback only if Moondream latency/quality trade-off requires it.
+
